@@ -1,103 +1,87 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const sqlite3 = require('sqlite3').verbose();
-const cors = require('cors');
-
+const fs = require('fs');
+const path = require('path');
 const app = express();
 const PORT = 3000;
-const SECRET_KEY = 'your_secret_key';
 
 // Middleware
 app.use(bodyParser.json());
-app.use(cors());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.static('public'));
 
-// Database setup
-const db = new sqlite3.Database('./threadly.db', (err) => {
-    if (err) {
-        console.error('Error opening database:', err.message);
-    } else {
-        console.log('Connected to SQLite database.');
-        db.run(`
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE,
-                password TEXT
-            );
-        `);
+// File paths for storing data
+const USERS_FILE = path.join(__dirname, 'data', 'users.json');
+const POSTS_FILE = path.join(__dirname, 'data', 'posts.json');
 
-        db.run(`
-            CREATE TABLE IF NOT EXISTS posts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                userId INTEGER,
-                content TEXT,
-                FOREIGN KEY (userId) REFERENCES users (id)
-            );
-        `);
+// Helper functions for reading and writing JSON files
+function readJSONFile(filePath) {
+    if (!fs.existsSync(filePath)) {
+        return [];
     }
-});
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+}
+
+function writeJSONFile(filePath, data) {
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+}
 
 // Routes
-// Signup
-app.post('/signup', async (req, res) => {
+app.post('/signup', (req, res) => {
     const { username, password } = req.body;
-    const hashedPassword = await bcrypt.hash(password, 10);
-    db.run(`INSERT INTO users (username, password) VALUES (?, ?)`, [username, hashedPassword], function (err) {
-        if (err) {
-            return res.status(400).json({ error: 'Username already exists' });
-        }
-        res.status(201).json({ message: 'User created successfully' });
-    });
+    if (!username || !password) {
+        return res.status(400).send('Username and password are required.');
+    }
+
+    const users = readJSONFile(USERS_FILE);
+
+    if (users.some(user => user.username === username)) {
+        return res.status(400).send('Username already exists.');
+    }
+
+    users.push({ username, password });
+    writeJSONFile(USERS_FILE, users);
+
+    res.status(200).send('Signup successful!');
 });
 
-// Login
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
-    db.get(`SELECT * FROM users WHERE username = ?`, [username], async (err, user) => {
-        if (err || !user) {
-            return res.status(400).json({ error: 'Invalid username or password' });
-        }
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(400).json({ error: 'Invalid username or password' });
-        }
-        const token = jwt.sign({ id: user.id, username: user.username }, SECRET_KEY, { expiresIn: '1h' });
-        res.json({ token });
-    });
+    const users = readJSONFile(USERS_FILE);
+
+    const user = users.find(user => user.username === username && user.password === password);
+    if (!user) {
+        return res.status(400).send('Invalid username or password.');
+    }
+
+    res.status(200).send('Login successful!');
 });
 
-// Create Post
-app.post('/posts', (req, res) => {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) {
-        return res.status(401).json({ error: 'Unauthorized' });
+app.post('/post', (req, res) => {
+    const { username, content } = req.body;
+    if (!username || !content) {
+        return res.status(400).send('Username and content are required.');
     }
-    try {
-        const decoded = jwt.verify(token, SECRET_KEY);
-        const { content } = req.body;
-        db.run(`INSERT INTO posts (userId, content) VALUES (?, ?)`, [decoded.id, content], function (err) {
-            if (err) {
-                return res.status(500).json({ error: 'Failed to create post' });
-            }
-            res.status(201).json({ message: 'Post created successfully' });
-        });
-    } catch (err) {
-        res.status(401).json({ error: 'Unauthorized' });
-    }
+
+    const posts = readJSONFile(POSTS_FILE);
+    const newPost = {
+        username,
+        content,
+        date: new Date().toISOString()
+    };
+
+    posts.push(newPost);
+    writeJSONFile(POSTS_FILE, posts);
+
+    res.status(200).send('Post created successfully!');
 });
 
-// Get Posts
 app.get('/posts', (req, res) => {
-    db.all(`SELECT posts.id, posts.content, users.username FROM posts
-            JOIN users ON posts.userId = users.id`, [], (err, rows) => {
-        if (err) {
-            return res.status(500).json({ error: 'Failed to fetch posts' });
-        }
-        res.json(rows);
-    });
+    const posts = readJSONFile(POSTS_FILE);
+    res.status(200).json(posts);
 });
 
+// Start server
 app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server is running on http://localhost:${PORT}`);
 });
