@@ -3,52 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Threadly Forum</title>
+    <title>Signup and Login</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f4f4f4;
+        }
+        .container {
+            width: 100%;
+            max-width: 400px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        form {
+            margin-bottom: 20px;
+        }
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .message {
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
 </head>
 <body>
-    <h1>Threadly Forum</h1>
-    <form id="postForm">
-        <label for="username">Username:</label>
-        <input type="text" id="username" name="username" required>
-        <br>
-        <textarea id="content" name="content" placeholder="Write your post here..." required></textarea>
-        <br>
-        <button type="submit">Post</button>
-    </form>
-    <hr>
-    <h2>Posts</h2>
-    <div id="posts"></div>
+    <div class="container">
+        <h1>Signup</h1>
+        <form id="signupForm">
+            <input type="text" id="signupUsername" placeholder="Username" required>
+            <input type="password" id="signupPassword" placeholder="Password" required>
+            <button type="submit">Signup</button>
+        </form>
+        <h1>Login</h1>
+        <form id="loginForm">
+            <input type="text" id="loginUsername" placeholder="Username" required>
+            <input type="password" id="loginPassword" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+        <div class="message" id="message"></div>
+    </div>
 
     <script>
-        async function loadPosts() {
-            const response = await fetch('/posts');
-            const posts = await response.json();
-            const postsDiv = document.getElementById('posts');
-            postsDiv.innerHTML = posts.map(post => `
-                <div>
-                    <p>${post.content}</p>
-                    <small>By: ${post.username} on ${new Date(post.date).toLocaleString()}</small>
-                </div>
-                <hr>
-            `).join('');
-        }
+        const signupForm = document.getElementById('signupForm');
+        const loginForm = document.getElementById('loginForm');
+        const messageDiv = document.getElementById('message');
 
-        document.getElementById('postForm').addEventListener('submit', async (e) => {
+        signupForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const username = document.getElementById('username').value;
-            const content = document.getElementById('content').value;
+            const username = document.getElementById('signupUsername').value;
+            const password = document.getElementById('signupPassword').value;
 
-            const response = await fetch('/post', {
+            const response = await fetch('/signup', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, content })
+                body: JSON.stringify({ username, password })
             });
-
-            alert(await response.text());
-            loadPosts();
+            const message = await response.text();
+            messageDiv.textContent = message;
         });
 
-        loadPosts();
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+
+            const response = await fetch('/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await response.json();
+
+            if (response.ok) {
+                messageDiv.textContent = `Login successful! Token: ${data.token}`;
+            } else {
+                messageDiv.textContent = data.message || 'Invalid credentials.';
+            }
+        });
     </script>
 </body>
 </html>
