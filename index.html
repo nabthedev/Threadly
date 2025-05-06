@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Threadly Forum</title>
+</head>
+<body>
+    <h1>Threadly Forum</h1>
+    <form id="postForm">
+        <label for="username">Username:</label>
+        <input type="text" id="username" name="username" required>
+        <br>
+        <textarea id="content" name="content" placeholder="Write your post here..." required></textarea>
+        <br>
+        <button type="submit">Post</button>
+    </form>
+    <hr>
+    <h2>Posts</h2>
+    <div id="posts"></div>
+
+    <script>
+        async function loadPosts() {
+            const response = await fetch('/posts');
+            const posts = await response.json();
+            const postsDiv = document.getElementById('posts');
+            postsDiv.innerHTML = posts.map(post => `
+                <div>
+                    <p>${post.content}</p>
+                    <small>By: ${post.username} on ${new Date(post.date).toLocaleString()}</small>
+                </div>
+                <hr>
+            `).join('');
+        }
+
+        document.getElementById('postForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const content = document.getElementById('content').value;
+
+            const response = await fetch('/post', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, content })
+            });
+
+            alert(await response.text());
+            loadPosts();
+        });
+
+        loadPosts();
+    </script>
+</body>
+</html>
